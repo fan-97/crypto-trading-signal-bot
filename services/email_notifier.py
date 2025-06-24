@@ -1,14 +1,21 @@
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import List
+from typing import Dict, Optional
 from datetime import datetime
 import sys
 import os
+from dotenv import load_dotenv
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.config import get_settings
 
+# 加载环境变量
+load_dotenv()
+
 settings = get_settings()
+
+# 从环境变量获取最小信心指数阈值，默认值为70
+MIN_CONFIDENCE_THRESHOLD = float(os.getenv('MIN_CONFIDENCE_THRESHOLD', 70))
 
 class EmailNotifier:
     def __init__(self):
@@ -22,21 +29,26 @@ class EmailNotifier:
         self,
         symbol: str,
         market_info: dict,
-        min_confidence: float = 70.0  # 只发送信心指数高于此值的信号
+        min_confidence: float = None
     ):
         """
-        发送交易信号通知邮件
+        发送交易信号邮件
         
         参数:
             symbol: 交易对
             market_info: 市场信息
-            min_confidence: 最小信心指数阈值
+            min_confidence: 最小信心指数阈值，如果为None则使用环境变量中的设置
         """
         signals = market_info['signals']
         recommendation = signals['recommendation']
         
+        # 如果没有指定阈值，使用环境变量中的设置
+        if min_confidence is None:
+            min_confidence = MIN_CONFIDENCE_THRESHOLD
+            
         # 检查信心指数是否达到阈值
         if recommendation['confidence'] < min_confidence:
+            print(f"[邮件通知] 信心指数 {recommendation['confidence']:.2f}% 低于阈值 {min_confidence}%，不发送通知")
             return
             
         # 创建邮件内容
@@ -86,6 +98,25 @@ class EmailNotifier:
                 body += f"<li>{indicator}: {value}</li>"
         body += "</ul>"
         
+        # 添加AI分析结果
+        if 'ai' in signals and signals['ai']:
+            ai_result = signals['ai']
+            body += "<h3>AI智能分析</h3>"
+            
+            # 检查AI分析是否禁用
+            if ai_result.get('disabled', False):
+                body += f"<p style='color: #888888;'><i>AI分析功能已禁用。要启用，请在.env文件中设置ENABLE_AI_ANALYSIS=true</i></p>"
+            elif 'error' in ai_result:
+                body += f"<p style='color: #FF0000;'>AI分析错误: {ai_result['error']}</p>"
+            else:
+                # 确定AI预测趋势的颜色
+                ai_trend_color = "#008000" if "看涨" in ai_result.get('trend', '') else "#FF0000" if "看跌" in ai_result.get('trend', '') else "#FFA500"
+                
+                body += f"<p>预测趋势: <span style='color: {ai_trend_color}; font-weight: bold;'>{ai_result.get('trend', '未知')}</span></p>"
+                body += f"<p>预测值: {ai_result.get('prediction', 0):.2f}</p>"
+                body += f"<p>信心指数: {ai_result.get('confidence', 0):.2f}</p>"
+                body += f"<p>AI建议: <strong>{ai_result.get('recommendation', '未知')}</strong></p>"
+        
         # 添加交易建议
         confidence_color = self._get_confidence_color(recommendation['confidence'])
         action_color = self._get_action_color(recommendation['action'])
@@ -104,13 +135,17 @@ class EmailNotifier:
         """
         
         for reason in recommendation['reasons']:
-            body += f"<li>{reason}</li>"
+            # 高亮显示AI相关的决策依据
+            if "AI分析" in reason:
+                body += f"<li style='color: #0066cc; font-weight: bold;'>{reason}</li>"
+            else:
+                body += f"<li>{reason}</li>"
             
         body += """
             </ul>
             <hr>
             <p style="font-size: 12px; color: #666;">
-                此邮件由自动交易系统生成，请勿直接回复。
+                此邮件由自动交易系统生成，包含AI智能分析结果。请勿直接回复。
             </p>
         </body>
         </html>

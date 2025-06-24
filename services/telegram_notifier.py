@@ -3,10 +3,17 @@ from typing import Dict, Optional
 from datetime import datetime
 import sys
 import os
+from dotenv import load_dotenv
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.config import get_settings
 
+# 加载环境变量
+load_dotenv()
+
 settings = get_settings()
+
+# 从环境变量获取最小信心指数阈值，默认值为70
+MIN_CONFIDENCE_THRESHOLD = float(os.getenv('MIN_CONFIDENCE_THRESHOLD', 70))
 
 class TelegramNotifier:
     def __init__(self):
@@ -18,7 +25,7 @@ class TelegramNotifier:
         self,
         symbol: str,
         market_info: dict,
-        min_confidence: float = 70.0
+        min_confidence: float = None
     ):
         """
         发送交易信号到Telegram
@@ -26,13 +33,18 @@ class TelegramNotifier:
         参数:
             symbol: 交易对
             market_info: 市场信息
-            min_confidence: 最小信心指数阈值
+            min_confidence: 最小信心指数阈值，如果为None则使用环境变量中的设置
         """
         signals = market_info['signals']
         recommendation = signals['recommendation']
         
+        # 如果没有指定阈值，使用环境变量中的设置
+        if min_confidence is None:
+            min_confidence = MIN_CONFIDENCE_THRESHOLD
+            
         # 检查信心指数是否达到阈值
         if recommendation['confidence'] < min_confidence:
+            print(f"[Telegram通知] 信心指数 {recommendation['confidence']:.2f}% 低于阈值 {min_confidence}%，不发送通知")
             return
             
         # 创建消息内容
@@ -82,6 +94,29 @@ class TelegramNotifier:
             else:
                 message.append(f"{indicator}: `{value}`")
                 
+        # 添加AI分析结果
+        if 'ai' in signals and signals['ai']:
+            ai_result = signals['ai']
+            message.extend([
+                "",
+                "🤖 *AI智能分析*"
+            ])
+            
+            # 检查AI分析是否禁用
+            if ai_result.get('disabled', False):
+                message.append("_AI分析功能已禁用\. 要启用\, 请在\.env文件中设置ENABLE\_AI\_ANALYSIS=true_")
+            elif 'error' in ai_result:
+                message.append(f"❌ AI分析错误: {ai_result['error']}")
+            else:
+                # 根据趋势选择emoji
+                trend = ai_result.get('trend', '')
+                trend_emoji = "📈" if "看涨" in trend else "📉" if "看跌" in trend else "⭐"
+                
+                message.append(f"{trend_emoji} 预测趋势: `{trend}`")
+                message.append(f"预测值: `{ai_result.get('prediction', 0):.2f}`")
+                message.append(f"信心指数: `{ai_result.get('confidence', 0):.2f}`")
+                message.append(f"💡 AI建议: `{ai_result.get('recommendation', '未知')}`")
+                
         # 添加交易建议
         action_emoji = self._get_action_emoji(recommendation['action'])
         message.extend([
@@ -94,7 +129,11 @@ class TelegramNotifier:
         ])
         
         for reason in recommendation['reasons']:
-            message.append(f"• {reason}")
+            # 特别AI相关的决策依据
+            if "AI分析" in reason:
+                message.append(f"🤖 {reason}")
+            else:
+                message.append(f"• {reason}")
             
         # 使用Markdown格式连接所有行
         return "\n".join(message)
@@ -133,5 +172,9 @@ class TelegramNotifier:
             return "⚠️"
         elif "建议卖出" in action:
             return "📉"
+        elif "建议持有" in action:
+            return "🔒"
+        elif "建议观望" in action:
+            return "🔍"
         else:
             return "⏳"

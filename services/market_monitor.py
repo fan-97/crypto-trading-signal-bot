@@ -48,8 +48,8 @@ class MarketMonitor:
                             limit=100  # 获取足够的历史数据用于分析
                         )
                         
-                        # 生成信号
-                        signals = self.signal_generator.generate_signals(df)
+                        # 生成信号（异步AI分析集成）
+                        signals = await self.signal_generator.generate_signals(df)
                         
                         # 添加基本市场信息
                         latest = df.iloc[-1]
