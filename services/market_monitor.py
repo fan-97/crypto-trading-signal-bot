@@ -47,10 +47,10 @@ class MarketMonitor:
                             interval=interval,
                             limit=100  # 获取足够的历史数据用于分析
                         )
-                        
+                        print("获取K线数据 {} {}".format(symbol, interval))
                         # 生成信号（异步AI分析集成）
                         signals = await self.signal_generator.generate_signals(df)
-                        
+                        print("生成信号 {} {}".format(symbol, interval))
                         # 添加基本市场信息
                         latest = df.iloc[-1]
                         market_info = {

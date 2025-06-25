@@ -57,7 +57,7 @@ async def main():
     monitor.add_callback(signal_callback)
     
     # 设置要监控的交易对和时间周期
-    symbols = ["BTCUSDT", "ETHUSDT"]  # 监控BTC和ETH
+    symbols = ["SOLUSDT", "ETHUSDT"]  # 监控BTC和ETH
     intervals = ["15m", "1h", "4h"]   # 监控多个时间周期
     
     try:

@@ -9,7 +9,10 @@ class Settings(BaseSettings):
     # API Keys
     deepseek_api_key: str = os.getenv("DEEPSEEK_API_KEY", "")
     binance_api_key: str = os.getenv("BINANCE_API_KEY", "")
-    binance_api_secret: str = os.getenv("BINANCE_API_SECRET", "")
+    binance_api_secret: str = os.getenv('BINANCE_API_SECRET',"")
+    enable_ai_analysis: bool = os.getenv('ENABLE_AI_ANALYSIS',"")
+    klines_limit: int = os.getenv('KLINES_LIMIT',250)
+    ai_confidence_threshold: float = os.getenv('AI_CONFIDENCE_THRESHOLD', 80)
 
     # Email Settings
     smtp_server: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")

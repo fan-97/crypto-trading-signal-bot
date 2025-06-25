@@ -13,6 +13,7 @@ settings = get_settings()
 class FuturesDataFetcher:
     def __init__(self):
         self.base_url = "https://fapi.binance.com"
+        self.settings = get_settings()
         
     async def get_klines(
         self,
@@ -20,7 +21,7 @@ class FuturesDataFetcher:
         interval: str,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
-        limit: int = 500
+        limit: Optional[int] = None
     ) -> pd.DataFrame:
         """
         获取合约K线数据
@@ -48,10 +49,13 @@ class FuturesDataFetcher:
         """
         try:
             # 构建请求参数
+            # 如果未指定limit，使用配置中的数量
+            klines_limit = limit if limit is not None else self.settings.klines_limit
+            
             params = {
                 "symbol": symbol.upper(),
                 "interval": interval,
-                "limit": min(limit, 1500)  # 确保不超过最大限制
+                "limit": min(klines_limit, 1500)  # 确保不超过最大限制
             }
             
             # 添加可选参数
